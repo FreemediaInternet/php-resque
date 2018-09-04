@@ -40,7 +40,14 @@ $REDIS_BACKEND = getenv('REDIS_BACKEND');
 
 // A redis database number
 $REDIS_BACKEND_DB = getenv('REDIS_BACKEND_DB');
-if(!empty($REDIS_BACKEND)) {
+$REDIS_BACKEND_SENTINEL_JSON = getenv('REDIS_BACKEND_SENTINEL');
+$REDIS_BACKEND_SENTINEL = json_decode($REDIS_BACKEND_SENTINEL_JSON, true);
+if (!empty($REDIS_BACKEND_SENTINEL) && is_array($REDIS_BACKEND_SENTINEL)) {
+    \Resque::setBackend(function ($x) use ($REDIS_BACKEND_SENTINEL) {
+        $client = new \Predis\Client($REDIS_BACKEND_SENTINEL['uri'], $REDIS_BACKEND_SENTINEL['options']);
+        return new \Resque_Redis('', null, $client);
+    });
+} elseif (!empty($REDIS_BACKEND)) {
     if (empty($REDIS_BACKEND_DB))
         Resque::setBackend($REDIS_BACKEND);
     else
