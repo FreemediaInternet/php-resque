@@ -142,10 +142,14 @@ class Resque_Worker
 	 *
 	 * @param int $interval How often to check for new jobs across the queues.
 	 */
-	public function work($interval = Resque::DEFAULT_INTERVAL, $blocking = false)
+	public function work($interval = Resque::DEFAULT_INTERVAL, $blocking = false, $timeAlive = false, $jobsToPerform = false)
 	{
 		$this->updateProcLine('Starting');
 		$this->startup();
+
+		// Start vars
+        $timeStart = microtime(true);
+        $jobsPerformed = 0;
 
 		while(true) {
 			if($this->shutdown) {
@@ -185,6 +189,15 @@ class Resque_Worker
 					usleep($interval * 1000000);
 				}
 
+				// break if time expired
+                if (is_numeric($timeAlive)) {
+                    $actualTime = microtime(true);
+                    if ($timeAlive < ($actualTime-$timeStart)) {
+                        $this->logger->log(Psr\Log\LogLevel::INFO, 'Ending worker, {seconds} seconds expired', ['seconds' => $timeAlive]);
+                        break;
+                    }
+                }
+
 				continue;
 			}
 
@@ -223,6 +236,15 @@ class Resque_Worker
 
 			$this->child = null;
 			$this->doneWorking();
+
+			// break if maximum jobs reached
+            $jobsPerformed++;
+            if (is_numeric($jobsToPerform)) {
+                if ($jobsToPerform < $jobsPerformed) {
+                    $this->logger->log(Psr\Log\LogLevel::INFO, 'Ending worker, Maximum number of jobs ({jobs_to_perform}) reached.', ['jobs_to_perform' => $jobsToPerform]);
+                    break;
+                }
+            }
 		}
 
 		$this->unregisterWorker();
